@@ -140,16 +140,17 @@ first."
                  (regexp #'org-ql--regexp-p)
                  (level #'org-ql--level-p)
                  (org-back-to-heading #'outline-back-to-heading))
-    (save-excursion
-      (save-restriction
-        (unless narrow
-          (widen))
-        (goto-char (point-min))
-        (when (org-before-first-heading-p)
-          (outline-next-heading))
-        (cl-loop when (funcall pred)
-                 collect (org-element-headline-parser (line-end-position))
-                 while (outline-next-heading))))))
+    (let ((case-fold-search nil))
+      (save-excursion
+        (save-restriction
+          (unless narrow
+            (widen))
+          (goto-char (point-min))
+          (when (org-before-first-heading-p)
+            (outline-next-heading))
+          (cl-loop when (funcall pred)
+                   collect (org-element-headline-parser (line-end-position))
+                   while (outline-next-heading)))))))
 
 ;;;;; Predicates
 

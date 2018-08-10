@@ -52,9 +52,15 @@
   (bench-multi :times 1
     :ensure-equal t
     :forms (("org-ql" (org-ql "~/Downloads/inbox.org"
-                        (and (regexp "emacs")
-                             (not (tags "emacs")))))
+                        (and (regexp "Emacs")
+                             (not (tags "Emacs")))))
             ("org-ql2" (org-ql2 "~/Downloads/inbox.org"
-                         (and (regexp "emacs")
-                             (not (tags "emacs")))))))
+                         (and (regexp "Emacs")
+                             (not (tags "Emacs")))))))
 #+END_SRC
+
+#+RESULTS:
+| Form    | x faster than next | Total runtime | # of GCs | Total GC runtime |
+|---------+--------------------+---------------+----------+------------------|
+| org-ql2 | 1.59               |   0.541548101 |        0 |              0.0 |
+| org-ql  | slowest            |    0.86144984 |        0 |              0.0 |

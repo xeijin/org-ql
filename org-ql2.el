@@ -181,25 +181,25 @@ first."
                   (regexp #'org-ql2--regexp-p)
                   (level #'org-ql2--level-p)
                   (org-back-to-heading #'outline-back-to-heading))
-    (save-excursion
-      (save-restriction
-        (unless narrow
-          (widen))
-        (goto-char (point-min))
-        (when (org-before-first-heading-p)
-          (outline-next-heading))
-        (cond (preamble-re
-               (cl-loop when (and (when (let ((case-fold-search nil))
-                                          (re-search-forward preamble-re nil t))
-                                    (outline-back-to-heading)
-                                    t)
-                                  (funcall pred))
-                        collect (org-element-headline-parser (line-end-position))
-                        while (outline-next-heading)))
-              (t
-               (cl-loop when (funcall pred)
-                        collect (org-element-headline-parser (line-end-position))
-                        while (outline-next-heading))))))))
+    (let ((case-fold-search nil))
+      (save-excursion
+        (save-restriction
+          (unless narrow
+            (widen))
+          (goto-char (point-min))
+          (when (org-before-first-heading-p)
+            (outline-next-heading))
+          (cond (preamble-re
+                 (cl-loop when (and (when (re-search-forward preamble-re nil t)
+                                      (outline-back-to-heading)
+                                      t)
+                                    (funcall pred))
+                          collect (org-element-headline-parser (line-end-position))
+                          while (outline-next-heading)))
+                (t
+                 (cl-loop when (funcall pred)
+                          collect (org-element-headline-parser (line-end-position))
+                          while (outline-next-heading)))))))))
 
 ;;;;; Predicates
 
