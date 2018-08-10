@@ -1,0 +1,60 @@
+#+BEGIN_SRC elisp
+  (bench-multi :times 1
+    :ensure-equal t
+    :forms (("org-ql" (org-ql "~/Downloads/inbox.org"
+                        (todo "TODO")))
+            ("org-ql2" (org-ql2 "~/Downloads/inbox.org"
+                         (todo "TODO")))))
+#+END_SRC
+
+#+RESULTS:
+| Form    | x faster than next | Total runtime | # of GCs | Total GC runtime |
+|---------+--------------------+---------------+----------+------------------|
+| org-ql2 | 2.81               |    0.29285038 |        0 |              0.0 |
+| org-ql  | slowest            |   0.823718397 |        0 |              0.0 |
+
+
+#+BEGIN_SRC elisp
+  (bench-multi :times 1
+    :ensure-equal t
+    :forms (("org-ql" (org-ql "~/Downloads/inbox.org"
+                        (and (todo "TODO")
+                             (tags "Emacs"))))
+            ("org-ql2" (org-ql2 "~/Downloads/inbox.org"
+                         (and (todo "TODO")
+                             (tags "Emacs"))))))
+#+END_SRC
+
+#+RESULTS:
+| Form    | x faster than next | Total runtime | # of GCs | Total GC runtime |
+|---------+--------------------+---------------+----------+------------------|
+| org-ql2 | 3.98               |   0.172147332 |        0 |              0.0 |
+| org-ql  | slowest            |   0.684864579 |        0 |              0.0 |
+
+#+BEGIN_SRC elisp
+  (bench-multi :times 1
+    :ensure-equal t
+    :forms (("org-ql" (org-ql "~/Downloads/inbox.org"
+                        (or (todo "TODO")
+                             (tags "Emacs"))))
+            ("org-ql2" (org-ql2 "~/Downloads/inbox.org"
+                         (or (todo "TODO")
+                             (tags "Emacs"))))))
+#+END_SRC
+
+#+RESULTS:
+| Form    | x faster than next | Total runtime | # of GCs | Total GC runtime |
+|---------+--------------------+---------------+----------+------------------|
+| org-ql2 | 1.00               |   2.633884956 |        0 |              0.0 |
+| org-ql  | slowest            |   2.637541889 |        0 |              0.0 |
+
+#+BEGIN_SRC elisp
+  (bench-multi :times 1
+    :ensure-equal t
+    :forms (("org-ql" (org-ql "~/Downloads/inbox.org"
+                        (and (regexp "emacs")
+                             (not (tags "emacs")))))
+            ("org-ql2" (org-ql2 "~/Downloads/inbox.org"
+                         (and (regexp "emacs")
+                             (not (tags "emacs")))))))
+#+END_SRC
