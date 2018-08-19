@@ -90,6 +90,47 @@ When nil, buffers are widened before being searched."
                          (cl-symbol-macrolet ((= #'=) (< #'<) (> #'>) (<= #'<=) (>= #'>=))
                            ,pred)))
          :sort ',sort))))
+(cl-defmacro org-agenda-ng2 (&rest args)
+  "Display an agenda-like buffer of entries in FILES that match PRED.
+
+FILES-OR-PRED is a sexp that is evaluated to get the list of
+files to scan.
+
+PRED is a predicate sexp which is evaluated on each entry to test
+whether it matches.  This should be a form used by `org-ql'.
+
+The predicate may be passed as FILES-OR-PRED and PRED may be left
+nil, in which case the list of files will automatically be set to
+the value of calling `org-agenda-files'.
+
+SORT is a list of sorting keys: `deadline', `scheduled',
+`date' (matching either `deadline' or `scheduled'), `priority',
+or `todo'.
+
+NARROW, when non-nil, means to respect narrowing in buffers.
+When nil, buffers are widened before being searched."
+  (declare (indent defun)
+           (advertised-calling-convention '(files-or-pred &optional pred &key sort narrow) nil))
+  (cl-macrolet ((set-keyword-args (args)
+                                  `(setq sort (plist-get ,args :sort)
+                                         narrow (plist-get ,args :narrow))))
+    (let ((files '(org-agenda-files))
+          pred sort narrow)
+      ;; Parse args manually (so we can leave FILES nil for a default argument).
+      (pcase args
+        (`(,arg-files ,arg-pred . ,(and rest (guard (keywordp (car rest)))))
+         (setq files arg-files
+               pred arg-pred)
+         (set-keyword-args rest))
+        (`(,arg-pred . ,(and rest (guard (keywordp (car rest)))))
+         (setq pred arg-pred)
+         (set-keyword-args rest)))
+      ;; Call --agenda
+      `(org-agenda-ng--agenda2 ,files
+         (byte-compile (lambda ()
+                         (cl-symbol-macrolet ((= #'=) (< #'<) (> #'>) (<= #'<=) (>= #'>=))
+                           ,pred)))
+         :sort ',sort))))
 
 ;;;; Functions
 
@@ -111,6 +152,29 @@ When nil, buffers are widened before being searched."
                             :sort sort
                             :action-fn #'org-agenda-ng--add-markers)))
          (result-string (s-join "\n" entries))
+         (target-buffer (get-buffer-create "test-agenda-ng")))
+    (with-current-buffer target-buffer
+      (read-only-mode -1)
+      (erase-buffer)
+      (insert result-string)
+      (read-only-mode 1)
+      (pop-to-buffer (current-buffer))
+      (org-agenda-finalize))))
+(cl-defun org-agenda-ng--agenda2 (files pred &key action-fn sort)
+  ;; `org-ql--query' uses `org-element-headline-parser' by default, which we then map
+  ;; `org-agenda-ng--format-element' across to get formatted, propertized strings for the agenda.
+  ;; NOTE: `org-element-headline-parser' should remain the low-level action function, because the
+  ;; sorting functions work on Org elements (so e.g. if we put `org-agenda-ng--format-element' as
+  ;; the low-level action function, sorting would do nothing, because the sorting functions would
+  ;; not find any data to sort on).  IOW we have to call `org-agenda-ng--format-element' here, not
+  ;; pass it to lower functions.
+  (declare (indent defun))
+  (let* ((entries (mapcar #'org-agenda-ng--format-element
+                          (eval `(org-ql2 ',files
+                                   ,pred
+                                   :sort ,sort
+                                   :action-fn #'org-agenda-ng--add-markers))))
+         (result-string (org-agenda-finalize-entries entries 'agenda))
          (target-buffer (get-buffer-create "test-agenda-ng")))
     (with-current-buffer target-buffer
       (read-only-mode -1)
