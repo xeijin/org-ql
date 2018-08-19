@@ -59,8 +59,9 @@ buffer."
        :sort ,(pcase sort
                 ;; Custom sort function
                 (`(function ,_) sort)
-                ((and sort (guard (cl-loop for elem in sort
-                                           always (memq elem '(date deadline scheduled todo priority)))))
+                ((guard (and sort
+                             (cl-loop for elem in sort
+                                      always (memq elem '(date deadline scheduled todo priority)))))
                  ;; Default sorting functions
                  (list 'quote sort))
                 ;; Other expression to evaluate
