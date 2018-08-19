@@ -191,7 +191,7 @@ first."
             (outline-next-heading))
           (cond (preamble-re
                  (cl-loop when (and (when (re-search-forward preamble-re nil t)
-                                      (outline-back-to-heading)
+                                      (outline-back-to-heading 'invisible-ok)
                                       t)
                                     (funcall pred))
                           collect (org-element-headline-parser (line-end-position))
