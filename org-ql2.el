@@ -132,7 +132,7 @@ replace the clause with a preamble."
           (items (-flatten-n 1 (--map (with-current-buffer (cl-typecase it
                                                              (buffer it)
                                                              (string (or (find-buffer-visiting it)
-                                                                         (find-file-noselect itm)
+                                                                         (find-file-noselect it)
                                                                          (user-error "Can't open file: %s" it))))
                                         (mapcar action-fn
                                                 (org-ql2--filter-buffer :pred pred :narrow narrow
