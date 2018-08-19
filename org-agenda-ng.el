@@ -119,17 +119,21 @@ When nil, buffers are widened before being searched."
       ;; Parse args manually (so we can leave FILES nil for a default argument).
       (pcase args
         (`(,arg-files ,arg-pred . ,(and rest (guard (keywordp (car rest)))))
+         ;; Files, query, and keyword args (FIXME: Can I combine this and the next one?  Does it
+         ;; matter if rest is nil or starts with a keyword?)
          (setq files arg-files
                pred arg-pred)
          (set-keyword-args rest))
         (`(,arg-pred . ,(and rest (guard (keywordp (car rest)))))
+         ;; Query and keyword args, no files
          (setq pred arg-pred)
-         (set-keyword-args rest)))
+         (set-keyword-args rest))
+        (`(,arg-pred)
+         ;; Only query
+         (setq pred arg-pred)))
       ;; Call --agenda
       `(org-agenda-ng--agenda2 ,files
-         (byte-compile (lambda ()
-                         (cl-symbol-macrolet ((= #'=) (< #'<) (> #'>) (<= #'<=) (>= #'>=))
-                           ,pred)))
+         ',pred
          :sort ',sort))))
 
 ;;;; Functions
