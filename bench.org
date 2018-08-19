@@ -64,3 +64,29 @@
 |---------+--------------------+---------------+----------+------------------|
 | org-ql2 | 1.59               |   0.541548101 |        0 |              0.0 |
 | org-ql  | slowest            |    0.86144984 |        0 |              0.0 |
+
+* Comparing with org-agenda-get-day-entries
+
+[2018-08-19 Sun 13:08]  ~org-agenda-get-day-entries~ doesn't return entries in the same format, so after separately verifying that they return the same items for this query, we just test the length in the macro as an extra check.
+
+#+BEGIN_SRC elisp
+  (bench-multi :times 5
+    :ensure-equal t
+    :forms (("org-ql" (length (org-ql (org-agenda-files)
+                                (todo "UNDERWAY"))))
+            ("org-ql2" (length (org-ql2 (org-agenda-files)
+                                 (todo "UNDERWAY"))))
+            ("org-agenda-get-day-entries" (length (let ((org-select-this-todo-keyword "UNDERWAY")
+                                                        (date (calendar-gregorian-from-absolute (org-today))))
+                                                    (cl-loop for file in (org-agenda-files)
+                                                             append (org-agenda-get-day-entries file date :todo)))))))
+#+END_SRC
+
+#+RESULTS:
+| Form                       | x faster than next | Total runtime | # of GCs | Total GC runtime |
+|----------------------------+--------------------+---------------+----------+------------------|
+| org-ql2                    |               1.02 |   0.932122413 |        0 |              0.0 |
+| org-agenda-get-day-entries |               5.03 |   0.948879865 |        0 |              0.0 |
+| org-ql                     |            slowest |   4.776758033 |        0 |              0.0 |
+
+Looks promising.
