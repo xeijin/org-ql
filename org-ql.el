@@ -177,6 +177,7 @@ If NARROW is non-nil, buffer will not be widened."
                  (regexp #'org-ql--regexp-p)
                  (heading #'org-ql--heading-p)
                  (level #'org-ql--level-p)
+                 (clocked #'org-ql--clocked-p)
                  (org-back-to-heading #'outline-back-to-heading))
     (save-excursion
       (save-restriction
@@ -224,7 +225,64 @@ Or, when possible, fix the problem."
 		  (org-ql--sanity-check-form (cdr elem)))
 	     else do (check elem))))
 
+(defun org-ql--clocked-timestamps ()
+  "Return list of clocked timestamps in current entry.
+Timestamp elements as returned by `org-element-context' are returned."
+  (save-excursion
+    (org-back-to-heading)
+    (cl-loop while (re-search-forward org-clock-line-re (org-entry-end-position) t)
+             collect (org-element-property :value (org-element-context)))))
+
+(defun org-ql--parse-time-string (s &optional end)
+  "Return Unix timestamp by parsing timestamp string S.
+Calls `parse-time-string' and fills in nil second, minute, and
+hour values, then calls `float-time'.  When END is non-nil, sets
+empty time values to 23:59:59; otherwise, to 00:00:00."
+  (cl-macrolet ((fill-with (place value)
+                           `(unless (nth ,place parsed-time)
+                              (setf (nth ,place parsed-time) ,value))))
+    (let ((parsed-time (parse-time-string s)))
+      (pcase end
+        ('nil (fill-with 0 0)
+              (fill-with 1 0)
+              (fill-with 2 0))
+        (_ (fill-with 0 59)
+           (fill-with 1 59)
+           (fill-with 2 23)))
+      (float-time (apply #'encode-time parsed-time)))))
+
 ;;;;; Predicates
+
+(defun org-ql--clocked-p (&optional from to)
+  "Return non-nil if current entry was clocked.
+FROM and/or TO, may be timestamp strings, in which case, return
+non-nil if the entry was clocked in the range specified by the
+given timestamps."
+  (when-let ((timestamps (org-ql--clocked-timestamps)))
+    (cond ((not (or from to))
+           ;; No dates to compare it to
+           t)
+          (t
+           ;; Compare to given dates
+           (let* ((from (when from
+                          (org-ql--parse-time-string from)))
+                  (to (when to
+                        (org-ql--parse-time-string to)))
+                  ;; We assume that timestamps are in drawer-order, i.e. most-recent-first, and that
+                  ;; each clocked line is a range.
+                  (latest-ts (--> (car timestamps)
+                                  (org-timestamp-split-range it 'end)
+                                  (org-timestamp--to-internal-time it)
+                                  (float-time it)))
+                  (other-tss (--> (cdr timestamps)
+                                  (-map #'org-timestamp--to-internal-time it)
+                                  (-map #'float-time it)))
+                  (times (nreverse (cons latest-ts other-tss))))
+             (cond ((and from to)
+                    (and (<= from (-last-item times))
+                         (<= (car times) to)))
+                   (from (<= from (-last-item times)))
+                   (to (<= (car times) to))))))))
 
 (defun org-ql--category-p (&rest categories)
   "Return non-nil if current heading is in one or more of CATEGORIES."
