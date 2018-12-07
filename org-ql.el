@@ -93,13 +93,29 @@ a list of defined `org-ql' sorting methods: `date', `deadline',
                     (_                  ; Buffer or string
                      (list buffers-or-files))))
          (predicate (byte-compile `(lambda ()
-                                     (cl-symbol-macrolet ((today org-ql--today) ; Necessary because of byte-compiling the lambda
-                                                          (= #'=)
-                                                          (< #'<)
-                                                          (> #'>)
-                                                          (<= #'<=)
-                                                          (>= #'>=))
-                                       ,query))))
+                                     ;; This is either really elegant or really ugly.  Well, also
+                                     ;; possibly somewhere in-between.  At the least, we should do
+                                     ;; this in a more flexible, abstracted way, but this will do
+                                     ;; for now.  Most importantly, it works!
+                                     (cl-macrolet ((clocked (&key from to on)
+                                                            (when on
+                                                              (setq from on
+                                                                    to on))
+                                                            (when from
+                                                              (setq from (org-ql--parse-time-string from)))
+                                                            (when to
+                                                              (setq to (org-ql--parse-time-string to 'end)))
+                                                            ;; NOTE: The macro must expand to the actual `org-ql--clocked-p'
+                                                            ;; function, not another `clocked' to be expanded by the
+                                                            ;; `org-ql--flet' later.
+                                                            `(org-ql--clocked-p :from ,from :to ,to)))
+                                       (cl-symbol-macrolet ((today org-ql--today) ; Necessary because of byte-compiling the lambda
+                                                            (= #'=)
+                                                            (< #'<)
+                                                            (> #'>)
+                                                            (<= #'<=)
+                                                            (>= #'>=))
+                                         ,query)))))
          (action (byte-compile action))
          ;; TODO: Figure out how to use or reimplement the org-scanner-tags feature.
          ;; (org-use-tag-inheritance t)
@@ -177,7 +193,6 @@ If NARROW is non-nil, buffer will not be widened."
                  (regexp #'org-ql--regexp-p)
                  (heading #'org-ql--heading-p)
                  (level #'org-ql--level-p)
-                 (clocked #'org-ql--clocked-p)
                  (org-back-to-heading #'outline-back-to-heading))
     (save-excursion
       (save-restriction
@@ -253,36 +268,36 @@ empty time values to 23:59:59; otherwise, to 00:00:00."
 
 ;;;;; Predicates
 
-(defun org-ql--clocked-p (&optional from to)
-  "Return non-nil if current entry was clocked.
-FROM and/or TO, may be timestamp strings, in which case, return
-non-nil if the entry was clocked in the range specified by the
-given timestamps."
-  (when-let ((timestamps (org-ql--clocked-timestamps)))
-    (cond ((not (or from to))
-           ;; No dates to compare it to
-           t)
-          (t
-           ;; Compare to given dates
-           (let* ((from (when from
-                          (org-ql--parse-time-string from)))
-                  (to (when to
-                        (org-ql--parse-time-string to)))
-                  ;; We assume that timestamps are in drawer-order, i.e. most-recent-first, and that
-                  ;; each clocked line is a range.
-                  (latest-ts (--> (car timestamps)
-                                  (org-timestamp-split-range it 'end)
-                                  (org-timestamp--to-internal-time it)
-                                  (float-time it)))
-                  (other-tss (--> (cdr timestamps)
-                                  (-map #'org-timestamp--to-internal-time it)
-                                  (-map #'float-time it)))
-                  (times (nreverse (cons latest-ts other-tss))))
-             (cond ((and from to)
-                    (and (<= from (-last-item times))
-                         (<= (car times) to)))
-                   (from (<= from (-last-item times)))
-                   (to (<= (car times) to))))))))
+(cl-defun org-ql--clocked-p (&key from to)
+  "Return non-nil if current entry was clocked in given period.
+If no arguments are specified, return non-nil if entry was
+clocked at any time.
+
+If FROM, return non-nil if entry was clocked on or after FROM.
+If TO, return non-nil if entry was clocked on or before TO.
+
+FROM and TO should be Unix timestamps.
+
+Note: See macrolet in `org-ql--query' which pre-processes
+arguments to this function, parsing timestamp strings into Unix
+timestamps and accepting `:on' keyword."
+  ;; FIXME: This assumes every "clocked" entry is a range.  Unclosed clock entries are not handled.
+  (cl-macrolet ((next-timestamp ()
+                                `(when (re-search-forward org-clock-line-re end-pos t)
+                                   (org-element-property :value (org-element-context))))
+                (test-timestamps (pred-form)
+                                 `(cl-loop for next-ts = (next-timestamp)
+                                           while next-ts
+                                           for beg = (float-time (org-timestamp--to-internal-time next-ts))
+                                           for end = (float-time (org-timestamp--to-internal-time next-ts 'end))
+                                           thereis ,pred-form)))
+    (save-excursion
+      (let ((end-pos (org-entry-end-position)))
+        (cond ((not (or from to)) (next-timestamp))
+              ((and from to) (test-timestamps (and (<= beg to)
+                                                   (>= end from))))
+              (from (test-timestamps (<= from end)))
+              (to (test-timestamps (<= beg to))))))))
 
 (defun org-ql--category-p (&rest categories)
   "Return non-nil if current heading is in one or more of CATEGORIES."
