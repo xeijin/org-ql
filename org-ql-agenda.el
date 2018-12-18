@@ -257,6 +257,10 @@ Its property list should be the second item in the list, as returned by `org-ele
              (difference-days (- today-day-number scheduled-day-number))
              (relative-due-date (org-add-props (org-ql-agenda--format-relative-date difference-days) nil
                                   'help-echo (org-element-property :raw-value scheduled-date)))
+             (scheduled-ts (ts-parse (org-element-property :raw-value scheduled-date)))
+             (difference (ts-difference scheduled-ts (ts-now)))
+             (relative-due-date (org-add-props (ts-human-format-duration (abs difference) 'abbr)
+                                    nil 'help-echo (org-element-property :raw-value scheduled-date)))
              ;; FIXME: Unused for now:
              ;; (show-all (or (eq org-agenda-repeating-timestamp-show-all t)
              ;;               (member todo-keyword org-agenda-repeating-timestamp-show-all)))
@@ -306,6 +310,40 @@ property."
              (difference-days (- today-day-number deadline-day-number))
              (relative-due-date (org-add-props (org-ql-agenda--format-relative-date difference-days) nil
                                   'help-echo (org-element-property :raw-value deadline-date)))
+             ;; FIXME: Unused for now: (todo-keyword (org-element-property :todo-keyword element))
+             ;; FIXME: Unused for now: (done-p (member todo-keyword org-done-keywords))
+             ;; FIXME: Unused for now: (today-p (= today-day-number deadline-day-number))
+             (deadline-passed-fraction (--> (- deadline-day-number today-day-number)
+                                            (float it)
+                                            (/ it (max org-deadline-warning-days 1))
+                                            (- 1 it)))
+             (face (org-agenda-deadline-face deadline-passed-fraction))
+             (title (--> (org-element-property :raw-value element)
+                         (org-add-props it nil
+                           'face face)))
+             (properties (--> (cadr element)
+                              (plist-put it :title title)
+                              (plist-put it :relative-due-date relative-due-date))))
+        (list (car element)
+              properties))
+    ;; No deadline
+    element))
+
+(defun org-ql-agenda--add-deadline-face (element)
+  "Add faces to ELEMENT's title for its deadline status.
+Also store relative due date as string in `:relative-due-date'
+property."
+  ;; FIXME: In my config, doesn't apply orange for approaching deadline the same way the Org Agenda does.
+  (if-let ((deadline-date (org-element-property :deadline element)))
+      (let* ((today-day-number (org-today))
+             (deadline-day-number (org-time-string-to-absolute
+                                   (org-element-timestamp-interpreter deadline-date 'ignore)))
+             (difference-days (- today-day-number deadline-day-number))
+             (relative-due-date (org-add-props (org-ql-agenda--format-relative-date difference-days) nil
+                                  'help-echo (org-element-property :raw-value deadline-date)))
+             (deadline-ts (ts-parse (org-element-property :raw-value deadline-date)))
+             (relative-due-date (org-add-props (ts-human-format-duration (ts-difference deadline-ts (ts-now)) 'abbr)
+                                    'help-echo (org-element-property :raw-value deadline-date)))
              ;; FIXME: Unused for now: (todo-keyword (org-element-property :todo-keyword element))
              ;; FIXME: Unused for now: (done-p (member todo-keyword org-done-keywords))
              ;; FIXME: Unused for now: (today-p (= today-day-number deadline-day-number))
